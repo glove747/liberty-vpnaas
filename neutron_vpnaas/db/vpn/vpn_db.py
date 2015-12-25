@@ -122,7 +122,7 @@ class VPNPluginDb(vpnaas.VPNPluginBase, base_db.CommonDbMixin):
         validator.assign_sensible_ipsec_sitecon_defaults(ipsec_sitecon)
         tenant_id = self._get_tenant_id_for_create(context, ipsec_sitecon)
         with context.session.begin(subtransactions=True):
-            #Check permissions
+            # Check permissions
             self._get_resource(context, vpn_models.VPNService,
                                ipsec_sitecon['vpnservice_id'])
             self._get_resource(context, vpn_models.IKEPolicy,
@@ -528,7 +528,7 @@ class VPNPluginRpcDbMixin(object):
         # case of distributed the vpn service should reside
         # only on a dvr_snat node.
         agent_mode = agent_conf.get('agent_mode', 'legacy')
-        if not agent.admin_state_up or agent_mode == 'dvr':
+        if not agent.admin_state_up:
             return []
         query = context.session.query(vpn_models.VPNService)
         query = query.join(vpn_models.IPsecSiteConnection)
@@ -536,11 +536,11 @@ class VPNPluginRpcDbMixin(object):
         query = query.join(vpn_models.IPsecPolicy)
         query = query.join(vpn_models.IPsecPeerCidr)
         query = query.join(l3_agent_db.RouterL3AgentBinding,
-                           l3_agent_db.RouterL3AgentBinding.router_id ==
+                           l3_agent_db.RouterL3AgentBinding.router_id == 
                            vpn_models.VPNService.router_id)
         query = query.filter(
             l3_agent_db.RouterL3AgentBinding.l3_agent_id == agent.id)
-        return query
+        return query, agent_mode
 
     def update_status_by_agent(self, context, service_status_info_list):
         """Updating vpnservice and vpnconnection status.

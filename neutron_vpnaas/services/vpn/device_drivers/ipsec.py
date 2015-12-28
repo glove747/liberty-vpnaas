@@ -624,9 +624,15 @@ class IPsecDriver(device_drivers.DeviceDriver):
         iptables_manager = self.get_router_based_iptables_manager(router)
         iptables_manager.ipv4['nat'].remove_rule(chain, rule, top=top)
     
-    def add_ip_rule(self, ns, src_cidr, dest_cidr):
+    def _add_ip_rule_on_ns(self, namespace, cmd, check_exit_code=True, extra_ok_codes=None):
+        """Execute command on namespace."""
+        ip_wrapper = ip_lib.IPWrapper(namespace=namespace)
+        return ip_wrapper.netns.execute(cmd, check_exit_code=check_exit_code,
+                                        extra_ok_codes=extra_ok_codes)
+    
+    def add_ip_rule(self, namespace, src_cidr, dest_cidr):
         snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
-        self._execute(['ip netns exec', ns, 'ip rule add from', src_cidr,
+        self._add_ip_rule_on_ns(namespace, ['ip rule add from', src_cidr,
                        'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
     
     def remove_ip_rule(self, ns, src_cidr, dest_cidr):

@@ -43,10 +43,10 @@ class IPsecVpnDriverCallBack(object):
     def get_vpn_services_on_host(self, context, host=None):
         """Returns the vpnservices on the host."""
         plugin = self.driver.service_plugin
-        vpnservices = plugin._get_agent_hosting_vpn_services(
+        vpnservices, agent_mode = plugin._get_agent_hosting_vpn_services(
             context, host)
         return [self.driver.make_vpnservice_dict(vpnservice)
-                for vpnservice in vpnservices]
+                for vpnservice in vpnservices], agent_mode
 
     def update_status(self, context, status):
         """Update status of vpnservices."""

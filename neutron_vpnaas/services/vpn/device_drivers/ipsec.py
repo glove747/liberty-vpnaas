@@ -846,8 +846,10 @@ class IPsecDriver(device_drivers.DeviceDriver):
         In order to handle, these failure cases,
         This driver takes simple sync strategies.
         """
-        vpnservices, agent_mode = self.agent_rpc.get_vpn_services_on_host(
+        result = self.agent_rpc.get_vpn_services_on_host(
             context, self.host)
+        vpnservices = result[0]
+        agent_mode = result[1]
         router_ids = [vpnservice['router_id'] for vpnservice in vpnservices]
         sync_router_ids = [router['id'] for router in routers]
 

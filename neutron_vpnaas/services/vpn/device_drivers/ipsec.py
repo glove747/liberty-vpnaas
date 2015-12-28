@@ -884,7 +884,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 else:
                     process.update()
 
-    def _delete_vpn_processes(self, sync_router_ids, agent_mode):
+    def _delete_vpn_processes(self, sync_router_ids, vpn_router_ids, agent_mode):
         # Delete any IPSec processes that are
         # associated with routers, but are not running the VPN service.
         for process_id in sync_router_ids:

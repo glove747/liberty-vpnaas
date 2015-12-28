@@ -36,7 +36,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
 from oslo_service import loopingcall
-from neutron.agent.l3 import dvr_local_router
+from neutron.agent.l3.dvr_local_router import DvrLocalRouter
 
 from neutron_vpnaas.extensions import vpnaas
 from neutron_vpnaas.services.vpn.common import topics
@@ -625,12 +625,12 @@ class IPsecDriver(device_drivers.DeviceDriver):
         iptables_manager.ipv4['nat'].remove_rule(chain, rule, top=top)
     
     def add_ip_rule(self, ns, src_cidr, dest_cidr):
-        snat_idx = dvr_local_router._get_snat_idx(src_cidr)
+        snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
         self._execute(['ip netns exec', ns, 'ip rule add from', src_cidr,
                        'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
     
     def remove_ip_rule(self, ns, src_cidr, dest_cidr):
-        snat_idx = dvr_local_router._get_snat_idx(src_cidr)
+        snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
         self._execute(['ip netns exec', ns, 'ip rule del from', src_cidr,
                        'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
         

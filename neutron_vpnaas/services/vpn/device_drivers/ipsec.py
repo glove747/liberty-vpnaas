@@ -707,7 +707,6 @@ class IPsecDriver(device_drivers.DeviceDriver):
         for ipsec_site_connection in vpnservice['ipsec_site_connections']:
             for peer_cidr in ipsec_site_connection['peer_cidrs']:
                 func(router_id, local_cidr, peer_cidr)
-        self.iptables_apply(router_id)
 
     def vpnservice_updated(self, context, **kwargs):
         """Vpnservice updated rpc handler

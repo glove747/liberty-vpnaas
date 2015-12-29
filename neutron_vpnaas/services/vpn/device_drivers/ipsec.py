@@ -632,11 +632,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def add_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
-        try:
-            vpn_idx = self._get_vpn_idx(router.router, src_cidr)
-        except:
-            LOG.warn("Can not get router idx: %s info", router['id'])
+        if not router: 
             return
+        vpn_idx = self._get_vpn_idx(router.router, src_cidr)
         if not router.floating_ips:
             return
         cmd = "ip rule add from %s to %s lookup %s pref %s" \
@@ -645,11 +643,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def remove_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
-        try:
-            vpn_idx = self._get_vpn_idx(router.router, src_cidr)
-        except:
-            LOG.warn("Can not get router idx: %s info", router['id'])
+        if not router: 
             return
+        vpn_idx = self._get_vpn_idx(router.router, src_cidr)
         cmd = "ip rule del from %s to %s lookup %s pref %s" \
             % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
         self._exec_ip_rule_on_ns(namespace, cmd)

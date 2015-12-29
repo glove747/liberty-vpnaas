@@ -630,14 +630,17 @@ class IPsecDriver(device_drivers.DeviceDriver):
         return ip_wrapper.netns.execute(cmd, check_exit_code=check_exit_code,
                                         extra_ok_codes=extra_ok_codes)
     
-    def add_ip_rule(self, namespace, src_cidr, dest_cidr):
+    def add_ip_rule(self, router_id, dest_cidr):
+        router = self.routers.get(router_id)
+        if not router.floating_ips:
+            return
         snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
         self._add_ip_rule_on_ns(namespace, ['ip rule add from', src_cidr,
                        'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
     
-    def remove_ip_rule(self, ns, src_cidr, dest_cidr):
+    def remove_ip_rule(self, router_id, dest_cidr):
         snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
-        self._execute(['ip netns exec', ns, 'ip rule del from', src_cidr,
+        self._execute(['ip netns exec', namespace, 'ip rule del from', src_cidr,
                        'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
         
     def iptables_apply(self, router_id):
@@ -733,6 +736,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
         """
         process_id = router.router_id
         self.routers[process_id] = router
+        if cfg.CONF.agent_mode == 'dvr':
+            return
         if process_id in self.processes:
             # In case of vpnservice is created
             # before router's namespace
@@ -743,7 +748,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 return
             process.enable()
 
-    def destroy_process(self, process_id, agent_mode):
+    def destroy_process(self, process_id):
         """Destroy process.
 
         Disable the process, remove the nat rule, and remove the process
@@ -753,9 +758,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
             process = self.processes[process_id]
             process.disable()
             vpnservice = process.vpnservice
-            if vpnservice and agent_mode == 'dvr':
+            if vpnservice and cfg.CONF.agent_mode == 'dvr':
                 self._update_ip_rule(vpnservice, self.remove_ip_rule)
-            elif vpnservice and agent_mode == 'dvr_snat':
+            elif vpnservice and cfg.CONF.agent_mode == 'dvr_snat':
                 self._update_nat(vpnservice, self.remove_nat_rule)
             del self.processes[process_id]
 
@@ -852,20 +857,18 @@ class IPsecDriver(device_drivers.DeviceDriver):
         In order to handle, these failure cases,
         This driver takes simple sync strategies.
         """
-        result = self.agent_rpc.get_vpn_services_on_host(
+        vpnservices = self.agent_rpc.get_vpn_services_on_host(
             context, self.host)
-        vpnservices = result[0]
-        agent_mode = result[1]
         router_ids = [vpnservice['router_id'] for vpnservice in vpnservices]
         sync_router_ids = [router['id'] for router in routers]
 
-        self._sync_vpn_processes(vpnservices, sync_router_ids, agent_mode)
-        self._delete_vpn_processes(sync_router_ids, router_ids, agent_mode)
-        self._cleanup_stale_vpn_processes(router_ids, agent_mode)
+        self._sync_vpn_processes(vpnservices, sync_router_ids)
+        self._delete_vpn_processes(sync_router_ids, router_ids)
+        self._cleanup_stale_vpn_processes(router_ids)
 
         self.report_status(context)
 
-    def _sync_vpn_processes(self, vpnservices, sync_router_ids , agent_mode):
+    def _sync_vpn_processes(self, vpnservices, sync_router_ids):
         # Ensure the ipsec process is enabled only for
         # - the vpn services which are not yet in self.processes
         # - vpn services whose router id is in 'sync_router_ids'
@@ -874,9 +877,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
                     vpnservice['router_id'] in sync_router_ids):
                 process = self.ensure_process(vpnservice['router_id'],
                                               vpnservice=vpnservice)
-                if agent_mode == 'dvr':
+                if cfg.CONF.agent_mode == 'dvr':
                     self._update_ip_rule(vpnservice, self.add_ip_rule)
-                elif agent_mode == 'dvr_snat':
+                elif cfg.CONF.agent_mode == 'dvr_snat':
                     self._update_nat(vpnservice, self.add_nat_rule)
                 else:
                     continue
@@ -890,20 +893,20 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 else:
                     process.update()
 
-    def _delete_vpn_processes(self, sync_router_ids, vpn_router_ids, agent_mode):
+    def _delete_vpn_processes(self, sync_router_ids, vpn_router_ids):
         # Delete any IPSec processes that are
         # associated with routers, but are not running the VPN service.
         for process_id in sync_router_ids:
             if process_id not in vpn_router_ids:
-                self.destroy_process(process_id, agent_mode)
+                self.destroy_process(process_id)
 
-    def _cleanup_stale_vpn_processes(self, vpn_router_ids, agent_mode):
+    def _cleanup_stale_vpn_processes(self, vpn_router_ids):
         # Delete any IPSec processes running
         # VPN that do not have an associated router.
         process_ids = [pid for pid in self.processes
                        if pid not in vpn_router_ids]
         for process_id in process_ids:
-            self.destroy_process(process_id, agent_mode)
+            self.destroy_process(process_id)
 
 
 class OpenSwanDriver(IPsecDriver):

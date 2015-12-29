@@ -540,7 +540,7 @@ class VPNPluginRpcDbMixin(object):
                            vpn_models.VPNService.router_id)
         query = query.filter(
             l3_agent_db.RouterL3AgentBinding.l3_agent_id == agent.id)
-        return query, agent_mode
+        return query
 
     def update_status_by_agent(self, context, service_status_info_list):
         """Updating vpnservice and vpnconnection status.

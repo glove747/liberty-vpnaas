@@ -624,24 +624,32 @@ class IPsecDriver(device_drivers.DeviceDriver):
         iptables_manager = self.get_router_based_iptables_manager(router)
         iptables_manager.ipv4['nat'].remove_rule(chain, rule, top=top)
     
-    def _add_ip_rule_on_ns(self, namespace, cmd, check_exit_code=True, extra_ok_codes=None):
+    def _exec_ip_rule_on_ns(self, namespace, cmd, check_exit_code=True, extra_ok_codes=None):
         """Execute command on namespace."""
         ip_wrapper = ip_lib.IPWrapper(namespace=namespace)
         return ip_wrapper.netns.execute(cmd, check_exit_code=check_exit_code,
                                         extra_ok_codes=extra_ok_codes)
     
-    def add_ip_rule(self, router_id, dest_cidr):
+    def add_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
+        vpn_idx = self._get_vpn_idx(router, src_cidr)
         if not router.floating_ips:
             return
-        snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
-        self._add_ip_rule_on_ns(namespace, ['ip rule add from', src_cidr,
-                       'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
+        cmd = "ip rule add from %s to %s lookup %s pref %s" \
+            % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
+        self._exec_ip_rule_on_ns(namespace, cmd)
     
-    def remove_ip_rule(self, router_id, dest_cidr):
-        snat_idx = DvrLocalRouter._get_snat_idx(src_cidr)
-        self._execute(['ip netns exec', namespace, 'ip rule del from', src_cidr,
-                       'to', dest_cidr, 'lookup', snat_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY])
+    def remove_ip_rule(self, router_id, src_cidr, dest_cidr):
+        router = self.routers.get(router_id)
+        vpn_idx = self._get_vpn_idx(router, src_cidr)
+        cmd = "ip rule del from %s to %s lookup %s pref %s" \
+            % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
+        self._exec_ip_rule_on_ns(namespace, cmd)
+        
+    def _get_vpn_idx(self, router, subnet_cidr):
+        for subnet in router['subnets']:
+            if subnet['cidr'] == subnet_cidr:
+                return router._get_snat_idx(subnet['gateway_ip'] + '/24')
         
     def iptables_apply(self, router_id):
         """Apply IPtables.
@@ -689,11 +697,10 @@ class IPsecDriver(device_drivers.DeviceDriver):
         # This ipsec rule is not needed for ipv6.
         if netaddr.IPNetwork(local_cidr).version == 6:
             return
-################add_ip_rule(self, ns, src_cidr, dest_cidr, table, priority):
         router_id = vpnservice['router_id']
         for ipsec_site_connection in vpnservice['ipsec_site_connections']:
             for peer_cidr in ipsec_site_connection['peer_cidrs']:
-                func('qrouter-' + router_id, local_cidr, peer_cidr)
+                func(router_id, local_cidr, peer_cidr)
         self.iptables_apply(router_id)
 
     def vpnservice_updated(self, context, **kwargs):

@@ -652,7 +652,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         
     def _get_vpn_idx(self, router, subnet_cidr):
         for interface in router['_interfaces']:
-            for subnet in router['subnets']:
+            for subnet in interface['subnets']:
                 if subnet['cidr'] == subnet_cidr:
                     return router._get_snat_idx(subnet['gateway_ip'] + '/24')
         

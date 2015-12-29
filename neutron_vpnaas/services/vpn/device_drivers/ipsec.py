@@ -717,7 +717,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         and store it in self.processs
         """
         process = self.processes.get(process_id)
-        if not process or not process.namespace:
+        if not process or not process.namespace and cfg.CONF.agent_mode != 'dvr':
             namespace = self.get_namespace(process_id)
             process = self.create_process(
                 process_id,

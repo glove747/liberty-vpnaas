@@ -632,7 +632,11 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def add_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
-        vpn_idx = self._get_vpn_idx(router, src_cidr)
+        try:
+            vpn_idx = self._get_vpn_idx(router.router, src_cidr)
+        except:
+            LOG.warn("Can not get router idx: %s info", router['id'])
+            return
         if not router.floating_ips:
             return
         cmd = "ip rule add from %s to %s lookup %s pref %s" \
@@ -641,15 +645,20 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def remove_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
-        vpn_idx = self._get_vpn_idx(router, src_cidr)
+        try:
+            vpn_idx = self._get_vpn_idx(router.router, src_cidr)
+        except:
+            LOG.warn("Can not get router idx: %s info", router['id'])
+            return
         cmd = "ip rule del from %s to %s lookup %s pref %s" \
             % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
         self._exec_ip_rule_on_ns(namespace, cmd)
         
     def _get_vpn_idx(self, router, subnet_cidr):
-        for subnet in router['subnets']:
-            if subnet['cidr'] == subnet_cidr:
-                return router._get_snat_idx(subnet['gateway_ip'] + '/24')
+        for interface in router['_interfaces']:
+            for subnet in router['subnets']:
+                if subnet['cidr'] == subnet_cidr:
+                    return router._get_snat_idx(subnet['gateway_ip'] + '/24')
         
     def iptables_apply(self, router_id):
         """Apply IPtables.

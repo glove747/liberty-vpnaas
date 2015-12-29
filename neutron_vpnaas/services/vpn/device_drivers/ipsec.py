@@ -885,15 +885,16 @@ class IPsecDriver(device_drivers.DeviceDriver):
         # - the vpn services which are not yet in self.processes
         # - vpn services whose router id is in 'sync_router_ids'
         for vpnservice in vpnservices:
-            if vpnservice['router_id'] not in self.processes or (
-                    vpnservice['router_id'] in sync_router_ids):
-                if cfg.CONF.agent_mode != 'dvr':
-                    process = self.ensure_process(vpnservice['router_id'],
-                                                  vpnservice=vpnservice)
-                if cfg.CONF.agent_mode == 'dvr':
+            # # For dvr mode
+            if cfg.CONF.agent_mode == 'dvr':
                     self._update_ip_rule(vpnservice, self.add_ip_rule)
                     continue
-                elif cfg.CONF.agent_mode == 'dvr_snat':
+                
+            if vpnservice['router_id'] not in self.processes or (
+                    vpnservice['router_id'] in sync_router_ids):
+                process = self.ensure_process(vpnservice['router_id'],
+                                                  vpnservice=vpnservice)
+                if cfg.CONF.agent_mode == 'dvr_snat':
                     self._update_nat(vpnservice, self.add_nat_rule)
                 else:
                     continue
@@ -911,6 +912,10 @@ class IPsecDriver(device_drivers.DeviceDriver):
         # Delete any IPSec processes that are
         # associated with routers, but are not running the VPN service.
         for process_id in sync_router_ids:
+            # # For dvr mode
+            if cfg.CONF.agent_mode == 'dvr':
+                self._update_ip_rule(vpnservice, self.remove_ip_rule)
+                continue 
             if process_id not in vpn_router_ids:
                 self.destroy_process(process_id)
 

@@ -729,8 +729,6 @@ class IPsecDriver(device_drivers.DeviceDriver):
         and store it in self.processs
         """
         process = self.processes.get(process_id)
-        if cfg.CONF.agent_mode == 'dvr':
-            return
         if not process or not process.namespace:
             namespace = self.get_namespace(process_id)
             process = self.create_process(
@@ -889,10 +887,12 @@ class IPsecDriver(device_drivers.DeviceDriver):
         for vpnservice in vpnservices:
             if vpnservice['router_id'] not in self.processes or (
                     vpnservice['router_id'] in sync_router_ids):
-                process = self.ensure_process(vpnservice['router_id'],
-                                              vpnservice=vpnservice)
+                if cfg.CONF.agent_mode != 'dvr':
+                    process = self.ensure_process(vpnservice['router_id'],
+                                                  vpnservice=vpnservice)
                 if cfg.CONF.agent_mode == 'dvr':
                     self._update_ip_rule(vpnservice, self.add_ip_rule)
+                    continue
                 elif cfg.CONF.agent_mode == 'dvr_snat':
                     self._update_nat(vpnservice, self.add_nat_rule)
                 else:

@@ -634,27 +634,28 @@ class IPsecDriver(device_drivers.DeviceDriver):
         router = self.routers.get(router_id)
         if not router: 
             return
-        vpn_idx = self._get_vpn_idx(router.router, src_cidr)
+        vpn_idx = self._get_vpn_idx(router, src_cidr)
         if not router.floating_ips:
             return
         cmd = "ip rule add from %s to %s lookup %s pref %s" \
             % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
-        self._exec_ip_rule_on_ns(namespace, cmd)
+        self._exec_ip_rule_on_ns(router.ns_name, cmd)
     
     def remove_ip_rule(self, router_id, src_cidr, dest_cidr):
         router = self.routers.get(router_id)
         if not router: 
             return
-        vpn_idx = self._get_vpn_idx(router.router, src_cidr)
+        vpn_idx = self._get_vpn_idx(router, src_cidr)
         cmd = "ip rule del from %s to %s lookup %s pref %s" \
             % (src_cidr, dest_cidr, vpn_idx, DVR_VPN_IP_RULE_PRIORITY)
-        self._exec_ip_rule_on_ns(namespace, cmd)
+        self._exec_ip_rule_on_ns(router.ns_name, cmd)
         
-    def _get_vpn_idx(self, router, subnet_cidr):
+    def _get_vpn_idx(self, ri, subnet_cidr):
+        router = ri.router
         for interface in router['_interfaces']:
             for subnet in interface['subnets']:
                 if subnet['cidr'] == subnet_cidr:
-                    return router._get_snat_idx(subnet['gateway_ip'] + '/24')
+                    return ri._get_snat_idx(subnet['gateway_ip'] + '/24')
         
     def iptables_apply(self, router_id):
         """Apply IPtables.

@@ -923,10 +923,36 @@ class IPsecDriver(device_drivers.DeviceDriver):
         return rules
     
     def _get_vpnservices_to_add(self, vpnservices):
-        return list(set(vpnservices) - set(self.vpnservices))
+        add_vpnservices = []
+        if self.vpnservices:
+            return vpnservices
+        if vpnservices:
+            return []
+        for vpnservice in vpnservices:
+            exist = False
+            for old_vpnservice in self.vpnservices:
+                if vpnservice['router_id'] == old_vpnservice['router_id']:
+                    exist = True
+                    break
+            if not exist:
+                add_vpnservices.append(vpnservice)
+        return add_vpnservices
     
     def _get_vpnservices_to_rem(self, vpnservices):
-        return list(set(self.vpnservices) - set(vpnservices))
+        rem_vpnservices = []
+        if self.vpnservices:
+            return []
+        if vpnservices:
+            return self.vpnservices
+        for old_vpnservice in self.vpnservices:
+            exist = False
+            for vpnservice in vpnservices:
+                if vpnservice['router_id'] == old_vpnservice['router_id']:
+                    exist = True
+                    break
+            if not exist:
+                rem_vpnservices.append(old_vpnservice)
+        return rem_vpnservices
 
     def _sync_vpn_ip_rules(self, vpnservices):
         add_vpnservices = self._get_vpnservices_to_add(vpnservices)

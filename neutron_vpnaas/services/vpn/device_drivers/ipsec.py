@@ -901,10 +901,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 self._update_ip_rule(vpnservice, self.add_ip_rule)
     
     def _rem_vpn_ip_rules(self, vpnservice, exist_ip_rules):
-        if not vpnservice:
-            rules = []
-        else:
-            rules = self._get_vpnservice_rules(vpnservice)
+        rules = self._get_vpnservice_rules(vpnservice)
         for exist_ip_rule in exist_ip_rules:
             if not exist_ip_rule.startswith(str(DVR_VPN_IP_RULE_PRIORITY)):
                 continue

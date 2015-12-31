@@ -904,6 +904,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
     def _rem_vpn_ip_rules(self, vpnservice, exist_ip_rules):
         rules = self._get_vpnservice_rules(vpnservice)
         for exist_ip_rule in exist_ip_rules:
+            if not exist_ip_rule.startswith(DVR_VPN_IP_RULE_PRIORITY):
+                continue
             exist = False
             for rule in rules:
                 if rule in exist_ip_rule:

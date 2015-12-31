@@ -924,9 +924,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def _get_vpnservices_to_add(self, vpnservices):
         add_vpnservices = []
-        if self.vpnservices:
+        if not self.vpnservices:
             return vpnservices
-        if vpnservices:
+        if not vpnservices:
             return []
         for vpnservice in vpnservices:
             exist = False
@@ -940,9 +940,9 @@ class IPsecDriver(device_drivers.DeviceDriver):
     
     def _get_vpnservices_to_rem(self, vpnservices):
         rem_vpnservices = []
-        if self.vpnservices:
+        if not self.vpnservices:
             return []
-        if vpnservices:
+        if not vpnservices:
             return self.vpnservices
         for old_vpnservice in self.vpnservices:
             exist = False

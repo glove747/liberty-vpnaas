@@ -960,7 +960,6 @@ class IPsecDriver(device_drivers.DeviceDriver):
     def _sync_vpn_ip_rules(self, vpnservices):
         add_vpnservices = self._get_vpnservices_to_add(vpnservices)
         rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
-        self.vpnservices = vpnservices
         for vpnservice in add_vpnservices:
             ri = self.routers.get(vpnservice['router_id'])
             exist_ip_rules = self._exist_ip_rules(ri)
@@ -970,6 +969,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
             ri = self.routers.get(vpnservice['router_id'])
             exist_ip_rules = self._exist_ip_rules(ri)   
             self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
+        
+        self.vpnservices = vpnservices
         
     def _sync_vpn_processes(self, vpnservices, sync_router_ids):
         # Ensure the ipsec process is enabled only for

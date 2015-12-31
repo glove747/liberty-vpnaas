@@ -908,10 +908,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
             exist = False
             for rule in rules:
                 if rule in exist_ip_rule:
-                    exist = True
+                    self._update_ip_rule(vpnservice, self.remove_ip_rule)
                     break
-            if not exist:
-                self._update_ip_rule(vpnservice, self.remove_ip_rule)
     
     def _get_vpnservice_rules(self, vpnservice):
         rules = []

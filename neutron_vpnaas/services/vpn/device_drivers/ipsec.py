@@ -635,8 +635,6 @@ class IPsecDriver(device_drivers.DeviceDriver):
         if not router: 
             return
         vpn_idx = self._get_vpn_idx(router, src_cidr)
-        if not router.floating_ips:
-            return
         cmd = ['ip', 'rule', 'add', 'from', src_cidr, 'to', dest_cidr,
                'lookup', vpn_idx, 'pref', DVR_VPN_IP_RULE_PRIORITY] 
         self._exec_ip_rule_on_ns(router.ns_name, cmd)

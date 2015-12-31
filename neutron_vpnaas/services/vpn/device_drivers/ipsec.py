@@ -901,7 +901,10 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 self._update_ip_rule(vpnservice, self.add_ip_rule)
     
     def _rem_vpn_ip_rules(self, vpnservice, exist_ip_rules):
-        rules = self._get_vpnservice_rules(vpnservice)
+        if not vpnservice:
+            rules = []
+        else:
+            rules = self._get_vpnservice_rules(vpnservice)
         for exist_ip_rule in exist_ip_rules:
             if not exist_ip_rule.startswith(str(DVR_VPN_IP_RULE_PRIORITY)):
                 continue
@@ -955,17 +958,24 @@ class IPsecDriver(device_drivers.DeviceDriver):
         return rem_vpnservices
 
     def _sync_vpn_ip_rules(self, vpnservices):
-        add_vpnservices = self._get_vpnservices_to_add(vpnservices)
-        rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
-        self.vpnservices = vpnservices
-        for vpnservice in add_vpnservices:
-            ri = self.routers.get(vpnservice['router_id'])
-            exist_ip_rules = self._exist_ip_rules(ri)
-            self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
-            
-        for vpnservice in rem_vpnservices:
+#         add_vpnservices = self._get_vpnservices_to_add(vpnservices)
+#         rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
+#         self.vpnservices = vpnservices
+#         for vpnservice in add_vpnservices:
+#             ri = self.routers.get(vpnservice['router_id'])
+#             exist_ip_rules = self._exist_ip_rules(ri)
+#             self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
+#             
+#         for vpnservice in rem_vpnservices:
+#             ri = self.routers.get(vpnservice['router_id'])
+#             exist_ip_rules = self._exist_ip_rules(ri)   
+#             self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
+        if not vpnservices:
+            self._rem_vpn_ip_rules([], exist_ip_rules)
+        for vpnservice in vpnservices:
             ri = self.routers.get(vpnservice['router_id'])
             exist_ip_rules = self._exist_ip_rules(ri)   
+            self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
             self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
         
     def _sync_vpn_processes(self, vpnservices, sync_router_ids):

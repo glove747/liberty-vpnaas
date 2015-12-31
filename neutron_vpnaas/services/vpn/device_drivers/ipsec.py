@@ -542,7 +542,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
         self.context = context.get_admin_context_without_session()
         self.topic = topics.IPSEC_AGENT_TOPIC
         node_topic = '%s.%s' % (self.topic, self.host)
-
+        
+        self.vpnservices = []
         self.processes = {}
         self.routers = {}
         self.process_status_cache = {}
@@ -920,12 +921,25 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 rule = 'from ' + local_cidr + ' to ' + peer_cidr
                 rules.append(rule)
         return rules
+    
+    def _get_vpnservices_to_add(self, vpnservices):
+        return list(set(vpnservices) - set(self.vpnservices))
+    
+    def _get_vpnservices_to_rem(self, vpnservices):
+        return list(set(self.vpnservices) - set(vpnservices))
 
     def _sync_vpn_ip_rules(self, vpnservices):
-        for vpnservice in vpnservices:
+        add_vpnservices = self._get_vpnservices_to_add(vpnservices)
+        rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
+        self.vpnservices = vpnservices
+        for vpnservice in add_vpnservices:
             ri = self.routers.get(vpnservice['router_id'])
             exist_ip_rules = self._exist_ip_rules(ri)
             self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
+            
+        for vpnservice in rem_vpnservices:
+            ri = self.routers.get(vpnservice['router_id'])
+            exist_ip_rules = self._exist_ip_rules(ri)   
             self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
         
     def _sync_vpn_processes(self, vpnservices, sync_router_ids):

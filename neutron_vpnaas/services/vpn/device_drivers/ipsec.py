@@ -891,7 +891,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         return exist_ip_rules
 
     def _add_vpn_ip_rules(self, vpnservice, exist_ip_rules):
-        rules = _get_vpnservice_rules(vpnservice)
+        rules = self._get_vpnservice_rules(vpnservice)
         for rule in rules:
             exist = False
             for exist_ip_rule in exist_ip_rules:

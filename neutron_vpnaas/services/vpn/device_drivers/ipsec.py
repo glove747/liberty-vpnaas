@@ -911,16 +911,6 @@ class IPsecDriver(device_drivers.DeviceDriver):
                     break
             if not exist:
                 self._update_ip_rule(vpnservice, self.remove_ip_rule)
-        
-        
-        for rule in rules:
-            exist = False
-            for exist_ip_rule in exist_ip_rules:
-                if rule in exist_ip_rule:
-                    exist = True
-                    break
-            if not exist:
-                self._update_ip_rule(vpnservice, self.add_ip_rule)
     
     def _get_vpnservice_rules(self, vpnservice):
         rules = []

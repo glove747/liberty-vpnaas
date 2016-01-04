@@ -895,7 +895,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 dst_cidr = cidr['dst_cidr']
                 self._update_ip_rule(router_id, src_cidr, dst_cidr, rem_ip_rule)
     
-    def ensure_vpn_ip_rules_sync(self):
+    def ensure_vpn_ip_rules_sync(self, context):
         namespaces = self._get_existed_router_namespaces()
         vpnservices = self.agent_rpc.get_vpn_services_on_host(
             context, self.host)
@@ -940,7 +940,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         """
         # # For dvr mode
         if cfg.CONF.agent_mode == 'dvr':
-            self.ensure_vpn_ip_rules_sync()
+            self.ensure_vpn_ip_rules_sync(context)
             return
         vpnservices = self.agent_rpc.get_vpn_services_on_host(
             context, self.host)

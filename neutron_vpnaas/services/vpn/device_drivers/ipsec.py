@@ -553,10 +553,16 @@ class IPsecDriver(device_drivers.DeviceDriver):
         self.conn.create_consumer(node_topic, self.endpoints, fanout=False)
         self.conn.consume_in_threads()
         self.agent_rpc = IPsecVpnDriverApi(topics.IPSEC_DRIVER_TOPIC)
-        self.process_status_cache_check = loopingcall.FixedIntervalLoopingCall(
-            self.report_status, self.context)
-        self.process_status_cache_check.start(
-            interval=self.conf.ipsec.ipsec_status_check_interval)
+        if cfg.CONF.agent_mode == 'dvr':
+            self.process_ip_rules = loopingcall.FixedIntervalLoopingCall(
+                self.ensure_vpn_ip_rules_sync, self.context)
+            self.process_ip_rules.start(
+                interval=self.conf.ipsec.sync_ip_rule_interval)
+        else:
+            self.process_status_cache_check = loopingcall.FixedIntervalLoopingCall(
+                self.report_status, self.context)
+            self.process_status_cache_check.start(
+                interval=self.conf.ipsec.ipsec_status_check_interval)
 
     def get_namespace(self, router_id):
         """Get namespace of router.
@@ -693,20 +699,18 @@ class IPsecDriver(device_drivers.DeviceDriver):
                     top=True)
         self.iptables_apply(router_id)
         
-    def _update_ip_rule(self, vpnservice, func):
+    def _update_ip_rule(self, router_id, local_cidr, peer_cidr, func):
         """Setting up ip rule in qrouter-ns.
         We need to setup ip rule for ipsec packet to avoid fip affect.
-        :param vpnservice: vpnservices
+        :param router_id: router_id
+        :param local_cidr: local_cidr
+        :param peer_cidr: peer_cidr
         :param func: self.add_ip_rule or self.remove_ip_rule
         """
-        local_cidr = vpnservice['subnet']['cidr']
         # This ipsec rule is not needed for ipv6.
         if netaddr.IPNetwork(local_cidr).version == 6:
             return
-        router_id = vpnservice['router_id']
-        for ipsec_site_connection in vpnservice['ipsec_site_connections']:
-            for peer_cidr in ipsec_site_connection['peer_cidrs']:
-                func(router_id, local_cidr, peer_cidr)
+        func(router_id, local_cidr, peer_cidr)
 
     def vpnservice_updated(self, context, **kwargs):
         """Vpnservice updated rpc handler
@@ -831,7 +835,70 @@ class IPsecDriver(device_drivers.DeviceDriver):
                         'status': constants.DOWN,
                         'updated_pending_status': True
                     }
+    def _get_existed_router_namespaces(self):
+        namespaces = []
+        cmd = ['ip', 'netns', 'list']
+        ip_wrapper = ip_lib.IPWrapper(namespace=None)
+        r_namespaces = ip_wrapper.netns.execute(cmd, check_exit_code=True,
+                                        extra_ok_codes=None)
+        for namespace in r_namespaces:
+            if r_namespaces.startswith(ROUTER_NS):
+                namespaces.append(namespace)
+        return namespaces
     
+    def sync_ip_rule_in_router_ns(self, namespace, vpnservices):
+        ip_rules = self._exist_vpn_ip_rules(namespace)
+        for vpnservice in vpnservices:
+            if vpnservice['router_id'] in namespace:
+                sync_ip_rules = self._get_vpnservice_rules(vpnservice)
+                self._exec_ip_rules_add(vpnservice['router_id'], ip_rules, sync_ip_rules)
+                self._exec_ip_rules_rem(vpnservice['router_id'], ip_rules, sync_ip_rules)
+                return
+        self._exec_ip_rules_rem(vpnservice['router_id'], ip_rules, [])
+                
+    def _get_src_and_dst_cidr(self, ip_rule):
+        cidr = {}
+        b = ip_rule.split()
+        for i in range(0, len(b)):
+            if 'from' in b[i]:
+                cidr['src_cidr'] = b[i + 1]
+            if 'to' in b[i]:
+                cidr['dst_cidr'] = b[i + 1]
+        return cidr
+        
+    def _exec_ip_rules_add(self, router_id, existed_ip_rules, sync_ip_rules):
+        for sync_ip_rule in sync_ip_rules:
+            exist = False
+            for existed_ip_rule in existed_ip_rules:
+                if sync_ip_rule in existed_ip_rule:
+                    exist = True
+                    break
+            if not exist:
+                cidr = self._get_src_and_dst_cidr(sync_ip_rule)
+                src_cidr = cidr['src_cidr']
+                dst_cidr = cidr['dst_cidr']
+                self._update_ip_rule(router_id, src_cidr, dst_cidr, add_ip_rule)
+    
+    def _exec_ip_rules_rem(self, router_id, existed_ip_rules, sync_ip_rules):
+        for existed_ip_rule in existed_ip_rules:
+            exist = False
+            for sync_ip_rule in sync_ip_rules:
+                if sync_ip_rule in existed_ip_rule:
+                    exist = True
+                    break
+            if not exist:
+                cidr = self._get_src_and_dst_cidr(existed_ip_rule)
+                src_cidr = cidr['src_cidr']
+                dst_cidr = cidr['dst_cidr']
+                self._update_ip_rule(router_id, src_cidr, dst_cidr, rem_ip_rule)
+    
+    def ensure_vpn_ip_rules_sync(self):
+        namespaces = self._get_existed_router_namespaces()
+        vpnservices = self.agent_rpc.get_vpn_services_on_host(
+            context, self.host)
+        for namespace in namespaces:
+            self.sync_ip_rule_in_router_ns(namespace, vpnservices)
+        
     def report_status(self, context):
         status_changed_vpn_services = []
         for process in self.processes.values():
@@ -868,12 +935,12 @@ class IPsecDriver(device_drivers.DeviceDriver):
         In order to handle, these failure cases,
         This driver takes simple sync strategies.
         """
+        # # For dvr mode
+        if cfg.CONF.agent_mode == 'dvr':
+            self.ensure_vpn_ip_rules_sync()
+            return
         vpnservices = self.agent_rpc.get_vpn_services_on_host(
             context, self.host)
-         # # For dvr mode
-        if cfg.CONF.agent_mode == 'dvr':
-            self._sync_vpn_ip_rules(vpnservices)
-            return
         router_ids = [vpnservice['router_id'] for vpnservice in vpnservices]
         sync_router_ids = [router['id'] for router in routers]
         self._sync_vpn_processes(vpnservices, sync_router_ids)
@@ -882,35 +949,14 @@ class IPsecDriver(device_drivers.DeviceDriver):
 
         self.report_status(context)
 
-    def _exist_ip_rules(self, ns_name):
+    def _exist_vpn_ip_rules(self, ns_name):
         exist_ip_rules = []
         cmd = ['ip', 'rule', 'list']
         result = self._exec_ip_rule_on_ns(ns_name, cmd)
         for r in result.split('\n'):
-            exist_ip_rules.append(r)
+            if r.startswith(DVR_VPN_IP_RULE_PRIORITY):
+                exist_ip_rules.append(r)
         return exist_ip_rules
-
-    def _add_vpn_ip_rules(self, vpnservice, exist_ip_rules):
-        rules = self._get_vpnservice_rules(vpnservice)
-        for rule in rules:
-            exist = False
-            for exist_ip_rule in exist_ip_rules:
-                if rule in exist_ip_rule:
-                    exist = True
-                    break
-            if not exist:
-                self._update_ip_rule(vpnservice, self.add_ip_rule)
-    
-    def _rem_vpn_ip_rules(self, vpnservice, exist_ip_rules):
-        rules = self._get_vpnservice_rules(vpnservice)
-        for exist_ip_rule in exist_ip_rules:
-            if not exist_ip_rule.startswith(str(DVR_VPN_IP_RULE_PRIORITY)):
-                continue
-            exist = False
-            for rule in rules:
-                if rule in exist_ip_rule:
-                    self._update_ip_rule(vpnservice, self.remove_ip_rule)
-                    break
     
     def _get_vpnservice_rules(self, vpnservice):
         rules = []
@@ -920,54 +966,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 rule = 'from ' + local_cidr + ' to ' + peer_cidr
                 rules.append(rule)
         return rules
-    
-    def _get_vpnservices_to_add(self, vpnservices):
-        add_vpnservices = []
-        if not self.vpnservices:
-            return vpnservices
-        if not vpnservices:
-            return []
-        for vpnservice in vpnservices:
-            exist = False
-            for old_vpnservice in self.vpnservices:
-                if vpnservice['router_id'] == old_vpnservice['router_id']:
-                    exist = True
-                    break
-            if not exist:
-                add_vpnservices.append(vpnservice)
-        return add_vpnservices
-    
-    def _get_vpnservices_to_rem(self, vpnservices):
-        rem_vpnservices = []
-        if not self.vpnservices:
-            return []
-        if not vpnservices:
-            return self.vpnservices
-        for old_vpnservice in self.vpnservices:
-            exist = False
-            for vpnservice in vpnservices:
-                if vpnservice['router_id'] == old_vpnservice['router_id']:
-                    exist = True
-                    break
-            if not exist:
-                rem_vpnservices.append(old_vpnservice)
-        return rem_vpnservices
 
-    def _sync_vpn_ip_rules(self, vpnservices):
-        add_vpnservices = self._get_vpnservices_to_add(vpnservices)
-        rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
-        for vpnservice in add_vpnservices:
-            ns_name = ROUTER_NS + vpnservice['router_id']
-            exist_ip_rules = self._exist_ip_rules(ns_name)
-            self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
-             
-        for vpnservice in rem_vpnservices:
-            ns_name = ROUTER_NS + vpnservice['router_id']
-            exist_ip_rules = self._exist_ip_rules(ns_name)   
-            self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
-        
-        self.vpnservices = vpnservices
-        
     def _sync_vpn_processes(self, vpnservices, sync_router_ids):
         # Ensure the ipsec process is enabled only for
         # - the vpn services which are not yet in self.processes

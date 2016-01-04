@@ -55,6 +55,9 @@ ipsec_opts = [
     cfg.IntOpt('ipsec_status_check_interval',
                default=60,
                help=_("Interval for checking ipsec status")),
+    cfg.IntOpt('sync_ip_rule_interval',
+               default=60,
+               help=_("Interval for sync vpn ip rule")),
     cfg.BoolOpt('enable_detailed_logging',
                 default=False,
                 help=_("Enable detail logging for ipsec pluto process. "

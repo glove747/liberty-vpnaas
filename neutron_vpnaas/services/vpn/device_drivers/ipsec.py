@@ -45,6 +45,7 @@ from neutron_vpnaas.services.vpn import device_drivers
 LOG = logging.getLogger(__name__)
 TEMPLATE_PATH = os.path.dirname(os.path.abspath(__file__))
 DVR_VPN_IP_RULE_PRIORITY = 32768
+ROUTER_NS = 'qrouter-'
 
 ipsec_opts = [
     cfg.StrOpt(
@@ -830,7 +831,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                         'status': constants.DOWN,
                         'updated_pending_status': True
                     }
-
+    
     def report_status(self, context):
         status_changed_vpn_services = []
         for process in self.processes.values():
@@ -881,10 +882,10 @@ class IPsecDriver(device_drivers.DeviceDriver):
 
         self.report_status(context)
 
-    def _exist_ip_rules(self, ri):
+    def _exist_ip_rules(self, ns_name):
         exist_ip_rules = []
         cmd = ['ip', 'rule', 'list']
-        result = self._exec_ip_rule_on_ns(ri.ns_name, cmd)
+        result = self._exec_ip_rule_on_ns(ns_name, cmd)
         for r in result.split('\n'):
             exist_ip_rules.append(r)
         return exist_ip_rules
@@ -956,13 +957,13 @@ class IPsecDriver(device_drivers.DeviceDriver):
         add_vpnservices = self._get_vpnservices_to_add(vpnservices)
         rem_vpnservices = self._get_vpnservices_to_rem(vpnservices)
         for vpnservice in add_vpnservices:
-            ri = self.routers.get(vpnservice['router_id'])
-            exist_ip_rules = self._exist_ip_rules(ri)
+            ns_name = ROUTER_NS + vpnservice['router_id']
+            exist_ip_rules = self._exist_ip_rules(ns_name)
             self._add_vpn_ip_rules(vpnservice, exist_ip_rules)
              
         for vpnservice in rem_vpnservices:
-            ri = self.routers.get(vpnservice['router_id'])
-            exist_ip_rules = self._exist_ip_rules(ri)   
+            ns_name = ROUTER_NS + vpnservice['router_id']
+            exist_ip_rules = self._exist_ip_rules(ns_name)   
             self._rem_vpn_ip_rules(vpnservice, exist_ip_rules)
         
         self.vpnservices = vpnservices

@@ -857,7 +857,8 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 self._exec_ip_rules_add(vpnservice['router_id'], ip_rules, sync_ip_rules)
                 self._exec_ip_rules_rem(vpnservice['router_id'], ip_rules, sync_ip_rules)
                 return
-        self._exec_ip_rules_rem(vpnservice['router_id'], ip_rules, [])
+        router_id = namespace[len(ROUTER_NS):]
+        self._exec_ip_rules_rem(router_id, ip_rules, [])
                 
     def _get_src_and_dst_cidr(self, ip_rule):
         cidr = {}

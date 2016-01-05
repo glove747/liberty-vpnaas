@@ -881,7 +881,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 cidr = self._get_src_and_dst_cidr(sync_ip_rule)
                 src_cidr = cidr['src_cidr']
                 dst_cidr = cidr['dst_cidr']
-                self._update_ip_rule(router_id, src_cidr, dst_cidr, add_ip_rule)
+                self._update_ip_rule(router_id, src_cidr, dst_cidr, self.add_ip_rule)
     
     def _exec_ip_rules_rem(self, router_id, existed_ip_rules, sync_ip_rules):
         for existed_ip_rule in existed_ip_rules:
@@ -894,7 +894,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
                 cidr = self._get_src_and_dst_cidr(existed_ip_rule)
                 src_cidr = cidr['src_cidr']
                 dst_cidr = cidr['dst_cidr']
-                self._update_ip_rule(router_id, src_cidr, dst_cidr, rem_ip_rule)
+                self._update_ip_rule(router_id, src_cidr, dst_cidr, self.remove_ip_rule)
     
     def ensure_vpn_ip_rules_sync(self, context):
         namespaces = self._get_existed_router_namespaces()

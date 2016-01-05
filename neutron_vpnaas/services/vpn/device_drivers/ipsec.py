@@ -844,7 +844,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         ip_wrapper = ip_lib.IPWrapper(namespace=None)
         r_namespaces = ip_wrapper.netns.execute(cmd, check_exit_code=True,
                                         extra_ok_codes=None)
-        for namespace in r_namespaces:
+        for namespace in r_namespaces.split('\n'):
             if r_namespaces.startswith(ROUTER_NS):
                 namespaces.append(namespace)
         return namespaces
@@ -957,7 +957,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         cmd = ['ip', 'rule', 'list']
         result = self._exec_ip_rule_on_ns(ns_name, cmd)
         for r in result.split('\n'):
-            if r.startswith(DVR_VPN_IP_RULE_PRIORITY):
+            if r.startswith(str(DVR_VPN_IP_RULE_PRIORITY)):
                 exist_ip_rules.append(r)
         return exist_ip_rules
     

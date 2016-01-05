@@ -845,7 +845,7 @@ class IPsecDriver(device_drivers.DeviceDriver):
         r_namespaces = ip_wrapper.netns.execute(cmd, check_exit_code=True,
                                         extra_ok_codes=None)
         for namespace in r_namespaces.split('\n'):
-            if r_namespaces.startswith(ROUTER_NS):
+            if namespace.startswith(ROUTER_NS):
                 namespaces.append(namespace)
         return namespaces
     
